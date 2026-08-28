@@ -52,14 +52,22 @@ steps:
     set -e
 
     TERRAFORM_VERSION="1.9.8"
+    TEMP_DIR=$(mktemp -d)
+
+    echo "Installing Terraform ${TERRAFORM_VERSION}..."
+    echo "Temporary directory: ${TEMP_DIR}"
+
+    cd "${TEMP_DIR}"
 
     wget -q https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
 
     unzip -o terraform_${TERRAFORM_VERSION}_linux_amd64.zip
 
-    sudo mv terraform /usr/local/bin/terraform
+    sudo install -m 0755 terraform /usr/local/bin/terraform
 
     terraform version
+
+    rm -rf "${TEMP_DIR}"
   displayName: 'Install Terraform'
 
 - task: AzureCLI@2
