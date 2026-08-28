@@ -17,9 +17,13 @@ spec:
         app: devops-calculator
 
     spec:
+      imagePullSecrets:
+        - name: acr-secret
+
       containers:
         - name: calculator
-          image: devops-calculator:1.0
+          image: acrdevopsfull2026.azurecr.io/devops-calculator:latest
+          imagePullPolicy: Always
 
           ports:
             - containerPort: 8080
