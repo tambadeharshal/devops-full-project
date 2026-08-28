@@ -7,52 +7,53 @@ pool:
 steps:
 
 # ============================================================
-# Node.js
+# 1. Install Node.js
 # ============================================================
+
 - task: NodeTool@0
+  displayName: 'Install Node.js'
   inputs:
     versionSpec: '20.x'
-  displayName: 'Install Node.js'
 
 
 # ============================================================
-# Install dependencies
+# 2. Install dependencies
 # ============================================================
+
 - script: |
+    set -e
     cd app
     npm ci
   displayName: 'Install dependencies'
 
 
 # ============================================================
-# Test application
+# 3. Test application
 # ============================================================
+
 - script: |
+    set -e
+
     cd app
-    npm start &
+
+    npm start > app.log 2>&1 &
+
+    echo "Waiting for application..."
     sleep 5
+
+    echo "Testing application..."
+
     curl --fail http://localhost:8080/health
+
+    echo "Application test successful."
+
   displayName: 'Test application'
 
 
 # ============================================================
-# Docker Build & Push
+# 4. Install Terraform
 # ============================================================
-- task: Docker@2
-  displayName: 'Build and Push Docker Image'
-  inputs:
-    containerRegistry: 'acr-docker-connection'
-    repository: 'devops-calculator'
-    command: 'buildAndPush'
-    Dockerfile: '**/Dockerfile'
-    tags: |
-      $(Build.BuildId)
-      latest
 
-
-# ============================================================
-# Install Terraform
-# ============================================================
 - bash: |
     set -e
 
@@ -60,11 +61,11 @@ steps:
     TEMP_DIR=$(mktemp -d)
 
     echo "Installing Terraform ${TERRAFORM_VERSION}..."
-    echo "Temporary directory: ${TEMP_DIR}"
 
     cd "${TEMP_DIR}"
 
-    wget -q https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+    wget -q \
+      https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
 
     unzip -o terraform_${TERRAFORM_VERSION}_linux_amd64.zip
 
@@ -73,107 +74,149 @@ steps:
     terraform version
 
     rm -rf "${TEMP_DIR}"
+
   displayName: 'Install Terraform'
 
 
 # ============================================================
-# Terraform Init
+# 5. Terraform Init
 # ============================================================
+
 - task: AzureCLI@2
   displayName: 'Terraform Init'
   inputs:
     azureSubscription: 'azure-terraform-connection'
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
+
     inlineScript: |
+
       set -e
 
       cd terraform
+
+      echo "=========================================="
+      echo "Terraform Init"
+      echo "=========================================="
 
       terraform init -upgrade
 
 
 # ============================================================
-# Terraform Validate
+# 6. Terraform Validate
 # ============================================================
+
 - task: AzureCLI@2
   displayName: 'Terraform Validate'
   inputs:
     azureSubscription: 'azure-terraform-connection'
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
+
     inlineScript: |
+
       set -e
 
       cd terraform
+
+      echo "=========================================="
+      echo "Terraform Validate"
+      echo "=========================================="
 
       terraform validate
 
 
 # ============================================================
-# Import Existing Resource Group
+# 7. Terraform Plan
 # ============================================================
-- task: AzureCLI@2
-  displayName: 'Import Existing Resource Group'
-  inputs:
-    azureSubscription: 'azure-terraform-connection'
-    scriptType: 'bash'
-    scriptLocation: 'inlineScript'
-    inlineScript: |
-      set -e
 
-      cd terraform
-
-      SUBSCRIPTION_ID=$(az account show --query id -o tsv)
-
-      RESOURCE_GROUP_ID="/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/rg-devops-full-project"
-
-      echo "Checking Terraform state..."
-
-      if terraform state show azurerm_resource_group.devops > /dev/null 2>&1; then
-        echo "Resource Group is already in Terraform state."
-      else
-        echo "Resource Group is not in Terraform state."
-        echo "Importing existing Resource Group..."
-
-        terraform import \
-          azurerm_resource_group.devops \
-          "$RESOURCE_GROUP_ID"
-      fi
-
-      echo "Terraform state:"
-      terraform state list
-
-
-# ============================================================
-# Terraform Plan
-# ============================================================
 - task: AzureCLI@2
   displayName: 'Terraform Plan'
   inputs:
     azureSubscription: 'azure-terraform-connection'
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
+
     inlineScript: |
+
       set -e
 
       cd terraform
+
+      echo "=========================================="
+      echo "Terraform Plan"
+      echo "=========================================="
 
       terraform plan -out=tfplan
 
 
 # ============================================================
-# Terraform Apply
+# 8. Terraform Apply
 # ============================================================
+
 - task: AzureCLI@2
   displayName: 'Terraform Apply'
   inputs:
     azureSubscription: 'azure-terraform-connection'
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
+
     inlineScript: |
+
       set -e
 
       cd terraform
 
+      echo "=========================================="
+      echo "Terraform Apply"
+      echo "=========================================="
+
       terraform apply -auto-approve tfplan
+
+      echo "=========================================="
+      echo "Terraform Apply Completed"
+      echo "=========================================="
+
+
+# ============================================================
+# 9. Get ACR Login Server
+# ============================================================
+
+- task: AzureCLI@2
+  displayName: 'Get ACR Login Server'
+  inputs:
+    azureSubscription: 'azure-terraform-connection'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+
+    inlineScript: |
+
+      set -e
+
+      ACR_NAME="acrdevopsfulltf2026"
+      RESOURCE_GROUP="rg-devops-full-project"
+
+      echo "Checking ACR..."
+
+      az acr show \
+        --name "$ACR_NAME" \
+        --resource-group "$RESOURCE_GROUP" \
+        --query "{Name:name,LoginServer:loginServer,ProvisioningState:provisioningState}" \
+        --output table
+
+
+# ============================================================
+# 10. Docker Build & Push
+# ============================================================
+
+- task: Docker@2
+  displayName: 'Build and Push Docker Image'
+  inputs:
+    containerRegistry: 'acr-docker-connection'
+    repository: 'devops-calculator'
+    command: 'buildAndPush'
+    Dockerfile: '**/Dockerfile'
+
+    tags: |
+      $(Build.BuildId)
+      latest

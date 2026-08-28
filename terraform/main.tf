@@ -15,10 +15,18 @@ provider "azurerm" {
   resource_provider_registrations = "none"
 }
 
+# ============================================================
+# Resource Group
+# ============================================================
+
 resource "azurerm_resource_group" "devops" {
   name     = "rg-devops-full-project"
   location = "Central India"
 }
+
+# ============================================================
+# Azure Container Registry
+# ============================================================
 
 resource "azurerm_container_registry" "acr" {
   name                = "acrdevopsfulltf2026"
@@ -28,9 +36,12 @@ resource "azurerm_container_registry" "acr" {
   admin_enabled       = true
 }
 
-resource "azurerm_kubernetes_cluster" "aks" {
-  name = "aks-devops-full-project"
+# ============================================================
+# Azure Kubernetes Service
+# ============================================================
 
+resource "azurerm_kubernetes_cluster" "aks" {
+  name                = "aks-devops-full-project"
   location            = azurerm_resource_group.devops.location
   resource_group_name = azurerm_resource_group.devops.name
 
