@@ -6,35 +6,38 @@ pool:
 
 steps:
 
-# -------------------------
+# ============================================================
 # Node.js
-# -------------------------
+# ============================================================
 - task: NodeTool@0
   inputs:
     versionSpec: '20.x'
   displayName: 'Install Node.js'
 
-# -------------------------
+
+# ============================================================
 # Install dependencies
-# -------------------------
+# ============================================================
 - script: |
     cd app
     npm ci
   displayName: 'Install dependencies'
 
-# -------------------------
+
+# ============================================================
 # Test application
-# -------------------------
+# ============================================================
 - script: |
     cd app
     npm start &
     sleep 5
-    curl http://localhost:8080/health
+    curl --fail http://localhost:8080/health
   displayName: 'Test application'
 
-# -------------------------
+
+# ============================================================
 # Docker Build & Push
-# -------------------------
+# ============================================================
 - task: Docker@2
   displayName: 'Build and Push Docker Image'
   inputs:
@@ -45,9 +48,11 @@ steps:
     tags: |
       $(Build.BuildId)
       latest
-# -------------------------
-# Terraform
-# -------------------------
+
+
+# ============================================================
+# Install Terraform
+# ============================================================
 - bash: |
     set -e
 
@@ -70,6 +75,10 @@ steps:
     rm -rf "${TEMP_DIR}"
   displayName: 'Install Terraform'
 
+
+# ============================================================
+# Terraform Init
+# ============================================================
 - task: AzureCLI@2
   displayName: 'Terraform Init'
   inputs:
@@ -77,9 +86,16 @@ steps:
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
+      set -e
+
       cd terraform
+
       terraform init -upgrade
 
+
+# ============================================================
+# Terraform Validate
+# ============================================================
 - task: AzureCLI@2
   displayName: 'Terraform Validate'
   inputs:
@@ -87,9 +103,51 @@ steps:
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
+      set -e
+
       cd terraform
+
       terraform validate
 
+
+# ============================================================
+# Import Existing Resource Group
+# ============================================================
+- task: AzureCLI@2
+  displayName: 'Import Existing Resource Group'
+  inputs:
+    azureSubscription: 'azure-terraform-connection'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      set -e
+
+      cd terraform
+
+      SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+
+      RESOURCE_GROUP_ID="/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/rg-devops-full-project"
+
+      echo "Checking Terraform state..."
+
+      if terraform state show azurerm_resource_group.devops > /dev/null 2>&1; then
+        echo "Resource Group is already in Terraform state."
+      else
+        echo "Resource Group is not in Terraform state."
+        echo "Importing existing Resource Group..."
+
+        terraform import \
+          azurerm_resource_group.devops \
+          "$RESOURCE_GROUP_ID"
+      fi
+
+      echo "Terraform state:"
+      terraform state list
+
+
+# ============================================================
+# Terraform Plan
+# ============================================================
 - task: AzureCLI@2
   displayName: 'Terraform Plan'
   inputs:
@@ -97,9 +155,16 @@ steps:
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
-      cd terraform
-      terraform plan
+      set -e
 
+      cd terraform
+
+      terraform plan -out=tfplan
+
+
+# ============================================================
+# Terraform Apply
+# ============================================================
 - task: AzureCLI@2
   displayName: 'Terraform Apply'
   inputs:
@@ -107,5 +172,8 @@ steps:
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
+      set -e
+
       cd terraform
-      terraform apply -auto-approve
+
+      terraform apply -auto-approve tfplan
