@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: devops-calculator
+
+spec:
+  replicas: 3
+
+  selector:
+    matchLabels:
+      app: devops-calculator
+
+  template:
+    metadata:
+      labels:
+        app: devops-calculator
+
+    spec:
+      containers:
+        - name: calculator
+          image: devops-calculator:1.0
+
+          ports:
+            - containerPort: 8080
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 20

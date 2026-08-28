@@ -1,0 +1,27 @@
+---
+- name: Configure Nginx
+  hosts: local
+  become: true
+
+  tasks:
+
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+        update_cache: true
+
+    - name: Start Nginx
+      service:
+        name: nginx
+        state: started
+        enabled: true
+
+    - name: Check Nginx
+      command: nginx -v
+      register: nginx_version
+      changed_when: false
+
+    - name: Display Nginx version
+      debug:
+        msg: "{{ nginx_version.stderr }}"
