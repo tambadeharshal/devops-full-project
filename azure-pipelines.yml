@@ -1,0 +1,47 @@
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+
+# -------------------------
+# Node.js
+# -------------------------
+- task: NodeTool@0
+  inputs:
+    versionSpec: '20.x'
+  displayName: 'Install Node.js'
+
+# -------------------------
+# Install dependencies
+# -------------------------
+- script: |
+    cd app
+    npm ci
+  displayName: 'Install dependencies'
+
+# -------------------------
+# Test application
+# -------------------------
+- script: |
+    cd app
+    npm start &
+    sleep 5
+    curl http://localhost:8080/health
+  displayName: 'Test application'
+
+# -------------------------
+# Docker Build & Push
+# -------------------------
+- task: Docker@2
+  displayName: 'Build and Push Docker Image'
+  inputs:
+    containerRegistry: 'acr-docker-connection'
+    repository: 'devops-calculator'
+    command: 'buildAndPush'
+    Dockerfile: '**/Dockerfile'
+    tags: |
+      $(Build.BuildId)
+      latest
