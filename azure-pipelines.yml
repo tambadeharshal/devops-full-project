@@ -45,33 +45,49 @@ steps:
     tags: |
       $(Build.BuildId)
       latest
-
 # -------------------------
 # Terraform
 # -------------------------
-- task: TerraformInstaller@1
-  displayName: 'Install Terraform'
-  inputs:
-    terraformVersion: '1.9.8'
+- bash: |
+    set -e
 
-- task: TerraformTaskV4@4
+    TERRAFORM_VERSION="1.9.8"
+
+    wget -q https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+
+    unzip -o terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+
+    sudo mv terraform /usr/local/bin/terraform
+
+    terraform version
+  displayName: 'Install Terraform'
+
+- task: AzureCLI@2
   displayName: 'Terraform Init'
   inputs:
-    provider: 'azurerm'
-    command: 'init'
-    workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+    azureSubscription: 'azure-terraform-connection'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      cd terraform
+      terraform init -upgrade
 
-- task: TerraformTaskV4@4
+- task: AzureCLI@2
   displayName: 'Terraform Validate'
   inputs:
-    provider: 'azurerm'
-    command: 'validate'
-    workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+    azureSubscription: 'azure-terraform-connection'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      cd terraform
+      terraform validate
 
-- task: TerraformTaskV4@4
+- task: AzureCLI@2
   displayName: 'Terraform Plan'
   inputs:
-    provider: 'azurerm'
-    command: 'plan'
-    workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
-    environmentServiceNameAzureRM: 'azure-terraform-connection'
+    azureSubscription: 'azure-terraform-connection'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      cd terraform
+      terraform plan
