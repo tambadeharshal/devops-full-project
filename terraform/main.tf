@@ -11,6 +11,8 @@ terraform {
 
 provider "azurerm" {
   features {}
+
+  resource_provider_registrations = "none"
 }
 
 resource "azurerm_resource_group" "devops" {
@@ -19,7 +21,7 @@ resource "azurerm_resource_group" "devops" {
 }
 
 resource "azurerm_container_registry" "acr" {
-  name = "acrdevopsfulltf2026"
+  name                = "acrdevopsfulltf2026"
   resource_group_name = azurerm_resource_group.devops.name
   location            = azurerm_resource_group.devops.location
   sku                 = "Basic"
@@ -27,7 +29,7 @@ resource "azurerm_container_registry" "acr" {
 }
 
 resource "azurerm_kubernetes_cluster" "aks" {
-  name                = "aks-devops-full-project"
+  name = "aks-devops-full-project"
 
   location            = azurerm_resource_group.devops.location
   resource_group_name = azurerm_resource_group.devops.name
